@@ -28,6 +28,18 @@ export function toString(term: Lambda): string {
   }
 }
 
+export function vari(name: string): Variable {
+  return { type: "Variable", name };
+}
+
+export function abs(name: string, body: Lambda): Abstraction {
+  return { type: "Abstraction", name, body };
+}
+
+export function app(left: Lambda, right: Lambda): Application {
+  return { type: "Application", left, right };
+}
+
 export function substitute(
   term: Lambda,
   name: string,

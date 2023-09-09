@@ -1,236 +1,87 @@
 import { expect, test, describe } from "bun:test";
 import {
   Lambda,
+  abs,
+  app,
   callByNameReduce,
   normalOrderReduce,
   reify,
   substitute,
+  vari,
 } from ".";
 
 describe("callByNameReduce", () => {
   test("reduces a simple application", () => {
-    const term: Lambda = {
-      type: "Application",
-      left: {
-        type: "Abstraction",
-        name: "x",
-        body: { type: "Variable", name: "x" },
-      },
-      right: { type: "Variable", name: "y" },
-    };
-    expect(callByNameReduce(term)).toEqual({ type: "Variable", name: "y" });
+    const term = app(abs("x", vari("x")), vari("y"));
+    expect(callByNameReduce(term)).toEqual(vari("y"));
   });
 
   test("reduces a nested application", () => {
-    const term: Lambda = {
-      type: "Application",
-      left: {
-        type: "Abstraction",
-        name: "x",
-        body: {
-          type: "Application",
-          left: { type: "Variable", name: "x" },
-          right: { type: "Variable", name: "y" },
-        },
-      },
-      right: { type: "Variable", name: "z" },
-    };
-    expect(callByNameReduce(term)).toEqual({
-      type: "Application",
-      left: { type: "Variable", name: "z" },
-      right: { type: "Variable", name: "y" },
-    });
+    const term = app(abs("x", app(vari("x"), vari("y"))), vari("z"));
+    expect(callByNameReduce(term)).toEqual(app(vari("z"), vari("y")));
   });
 
   test("does not reduce applications inside of abstractions", () => {
-    const term: Lambda = {
-      type: "Abstraction",
-      name: "x",
-      body: {
-        type: "Application",
-        left: {
-          type: "Abstraction",
-          name: "y",
-          body: { type: "Variable", name: "y" },
-        },
-        right: { type: "Variable", name: "x" },
-      },
-    };
+    const term = abs("x", app(abs("y", vari("y")), vari("x")));
     expect(callByNameReduce(term)).toEqual(term);
   });
 });
 
 describe("normalOrderReduce", () => {
   test("reduces a simple application", () => {
-    const term: Lambda = {
-      type: "Application",
-      left: {
-        type: "Abstraction",
-        name: "x",
-        body: { type: "Variable", name: "x" },
-      },
-      right: { type: "Variable", name: "y" },
-    };
-    expect(normalOrderReduce(term)).toEqual({ type: "Variable", name: "y" });
+    const term = app(abs("x", vari("x")), vari("y"));
+    expect(normalOrderReduce(term)).toEqual(vari("y"));
   });
 
   test("reduces a nested application", () => {
-    const term: Lambda = {
-      type: "Application",
-      left: {
-        type: "Abstraction",
-        name: "x",
-        body: {
-          type: "Application",
-          left: { type: "Variable", name: "x" },
-          right: { type: "Variable", name: "y" },
-        },
-      },
-      right: { type: "Variable", name: "z" },
-    };
-    expect(normalOrderReduce(term)).toEqual({
-      type: "Application",
-      left: { type: "Variable", name: "z" },
-      right: { type: "Variable", name: "y" },
-    });
+    const term = app(abs("x", app(vari("x"), vari("y"))), vari("z"));
+    expect(normalOrderReduce(term)).toEqual(app(vari("z"), vari("y")));
   });
 
   test("reduces applications inside of abstractions", () => {
-    const term: Lambda = {
-      type: "Abstraction",
-      name: "x",
-      body: {
-        type: "Application",
-        left: {
-          type: "Abstraction",
-          name: "y",
-          body: { type: "Variable", name: "y" },
-        },
-        right: { type: "Variable", name: "x" },
-      },
-    };
-    expect(normalOrderReduce(term)).toEqual({
-      type: "Abstraction",
-      name: "x",
-      body: { type: "Variable", name: "x" },
-    });
+    const term = abs("x", app(abs("y", vari("y")), vari("x")));
+    expect(normalOrderReduce(term)).toEqual(abs("x", vari("x")));
   });
 });
 
 describe("substitute", () => {
   test("replaces a variable with a variable", () => {
-    const term: Lambda = { type: "Variable", name: "x" };
-    expect(substitute(term, "x", { type: "Variable", name: "y" })).toEqual({
-      type: "Variable",
-      name: "y",
-    });
+    expect(substitute(vari("x"), "x", vari("y"))).toEqual(vari("y"));
   });
 
   test("replaces a variable with an abstraction", () => {
-    const term: Lambda = { type: "Variable", name: "x" };
-    expect(
-      substitute(term, "x", {
-        type: "Abstraction",
-        name: "y",
-        body: { type: "Variable", name: "y" },
-      })
-    ).toEqual({
-      type: "Abstraction",
-      name: "y",
-      body: { type: "Variable", name: "y" },
-    });
+    expect(substitute(vari("x"), "x", abs("y", vari("y")))).toEqual(
+      abs("y", vari("y"))
+    );
   });
 
   test("replaces a variable with an application", () => {
-    const term: Lambda = { type: "Variable", name: "x" };
-    expect(
-      substitute(term, "x", {
-        type: "Application",
-        left: { type: "Variable", name: "y" },
-        right: { type: "Variable", name: "z" },
-      })
-    ).toEqual({
-      type: "Application",
-      left: { type: "Variable", name: "y" },
-      right: { type: "Variable", name: "z" },
-    });
+    expect(substitute(vari("x"), "x", app(vari("y"), vari("z"))));
   });
 
   test("avoids variable capture", () => {
-    const term: Lambda = {
-      type: "Abstraction",
-      name: "z",
-      body: {
-        type: "Variable",
-        name: "x",
-      },
-    };
-    expect(
-      substitute(term, "x", {
-        type: "Variable",
-        name: "z",
-      })
-    ).toEqual({
-      type: "Abstraction",
-      name: "z",
-      body: {
-        type: "Variable",
-        name: "x",
-      },
-    });
+    expect(substitute(abs("z", vari("x")), "x", vari("z"))).toEqual(
+      abs("z", vari("x"))
+    );
   });
 
   test("avoids variable capture on nested abstractions", () => {
-    const term: Lambda = {
-      type: "Abstraction",
-      name: "z",
-      body: {
-        type: "Abstraction",
-        name: "y",
-        body: {
-          type: "Variable",
-          name: "x",
-        },
-      },
-    };
-    expect(
-      substitute(term, "x", {
-        type: "Variable",
-        name: "z",
-      })
-    ).toEqual(term);
+    expect(substitute(abs("z", abs("y", vari("x"))), "x", vari("z"))).toEqual(
+      abs("z", abs("y", vari("x")))
+    );
 
-    expect(
-      substitute(term, "x", {
-        type: "Variable",
-        name: "y",
-      })
-    ).toEqual(term);
+    expect(substitute(abs("z", abs("y", vari("x"))), "x", vari("y"))).toEqual(
+      abs("z", abs("y", vari("x")))
+    );
   });
 });
 
 describe("reify", () => {
   test("reifies a variable", () => {
-    const term: Lambda = { type: "Variable", name: "x" };
-    expect(reify(term)).toEqual({
-      type: "Variable",
-      name: "0",
-    });
+    expect(reify(vari("x"))).toEqual(vari("0"));
   });
 
   test("reifies an abstraction", () => {
-    const term: Lambda = {
-      type: "Abstraction",
-      name: "x",
-      body: { type: "Variable", name: "x" },
-    };
-    expect(reify(term)).toEqual({
-      type: "Abstraction",
-      name: "0",
-      body: {
-        type: "Variable",
-        name: "0",
-      },
-    });
+    expect(reify(abs("x", vari("x")))).toEqual(abs("0", vari("0")));
   });
 });
