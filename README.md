@@ -1,0 +1,5 @@
+# combinators
+
+```
+bun test --watch
+```
